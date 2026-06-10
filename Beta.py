@@ -114,6 +114,7 @@ class Coin:
     def __init__(self, x, y):
         self.rect = pygame.Rect(x, y, 20, 20)
         self.speed = 6
+        self.coinStuck = False
     def collidePaddle(self, paddle):
         if paddle.rect.colliderect(self.rect):
             return True
@@ -161,20 +162,21 @@ while Running:
             coins.append(coin)
     for coin in list(coins):
         coin.draw(screen)
-        coin.move()
-        coin.speed = 5
         BlocksToCheck=Blocks.copy()
-        for block in list(BlocksToCheck):
-            if block.rect.bottom <= coin.rect.top:
-                BlocksToCheck.remove(block)
-            elif coin.collideBlock(block):
-                coin.speed = 0
-                break
+        if coin.coinStuck == False:
+            for block in list(BlocksToCheck):
+                if block.rect.bottom <= coin.rect.top:
+                    BlocksToCheck.remove(block)
+                elif coin.collideBlock(block):
+                    coin.coinStuck= True
+                    coin.speed = 0
+                    break
+            coin.move()
         if coin.collidePaddle(paddle1):
             coins.remove(coin)
             RightPoint+=1
             RenderRight = TextFont.render(str(RightPoint), True, (255, 0, 0))
-        if coin.rect.top >= ScreenHeight:
+        elif coin.rect.top >= ScreenHeight:
             coins.remove(coin)
 
     paddle1.move(pygame.K_d, pygame.K_a)
