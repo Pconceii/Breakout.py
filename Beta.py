@@ -167,10 +167,11 @@ while Running:
             for block in list(BlocksToCheck):
                 if block.rect.bottom <= coin.rect.top:
                     BlocksToCheck.remove(block)
-                elif coin.collideBlock(block):
+                if coin.collideBlock(block):
                     coin.coinStuck= True
                     coin.speed = 0
-                    break
+                else:
+                    coin.coinStuck= False
             coin.move()
         if coin.collidePaddle(paddle1):
             coins.remove(coin)
