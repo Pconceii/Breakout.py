@@ -153,7 +153,6 @@ while Running:
     screen.fill((0,0,0))
     #COLLISION
     ball1.collide(paddle1)
-    #POINT DETECTION
     for block in list(Blocks):
         block.draw(screen)
         if block.collide(ball1):
@@ -163,23 +162,20 @@ while Running:
     for coin in list(coins):
         coin.draw(screen)
         coin.move()
+        coin.speed = 5
+        BlocksToCheck=Blocks.copy()
+        for block in list(BlocksToCheck):
+            if block.rect.bottom <= coin.rect.top:
+                BlocksToCheck.remove(block)
+            elif coin.collideBlock(block):
+                coin.speed = 0
+                break
         if coin.collidePaddle(paddle1):
             coins.remove(coin)
             RightPoint+=1
             RenderRight = TextFont.render(str(RightPoint), True, (255, 0, 0))
         if coin.rect.top >= ScreenHeight:
             coins.remove(coin)
-
-    for coin in list(coins):
-        coin.speed = 5
-        BlocksToCheck=Blocks.copy()
-        for block in list(BlocksToCheck):
-            if block.rect.bottom <= coin.rect.top:
-                BlocksToCheck.remove(block)
-            for checkableBlock in list(BlocksToCheck):
-                if coin.collideBlock(checkableBlock):
-                    coin.speed = 0
-                    break
 
     paddle1.move(pygame.K_d, pygame.K_a)
 
