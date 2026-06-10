@@ -172,12 +172,12 @@ while Running:
 
     for coin in list(coins):
         coin.speed = 5
-        BlocksToCheck=Blocks
-        for block in list(Blocks):
+        BlocksToCheck=Blocks.copy()
+        for block in list(BlocksToCheck):
             if block.rect.bottom <= coin.rect.top:
                 BlocksToCheck.remove(block)
             for checkableBlock in list(BlocksToCheck):
-                if coin.collideBlock(BlocksToCheck):
+                if coin.collideBlock(checkableBlock):
                     coin.speed = 0
                     break
 
