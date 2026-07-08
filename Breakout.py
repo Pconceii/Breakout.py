@@ -28,7 +28,7 @@ rareLevel3= None
 LeftPoint = 0
 RightPoint = 0
 coin_speed=1
-gain=100#the amount of coins dropped by a block
+gain=1#the amount of coins dropped by a block
 TextFont = pygame.font.SysFont("Helvetica", 70)
 TextFontSmall = pygame.font.SysFont("Helvetica", 40)
 TextFontXSmall = pygame.font.SysFont("Helvetica", 30)
@@ -124,8 +124,8 @@ map1 = [
 
 ]
 state="start"
-#maps=[map1, map2, map3, map4, map5, map6, map7]
-maps = [mapBlank]
+maps=[map1, map2, map3, map4, map5, map6, map7]
+#maps = [mapBlank]
 safeMaps= maps.copy()
 rarities={"common" :  [1,(130,130,130)],
           "rare": [1.5,(47,147,255)],
