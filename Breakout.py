@@ -1,12 +1,14 @@
 import pygame
 import random
 import math
+import sys
 
 pygame.init()
 upgrade1 = []
 upgrade2 = []
 upgrade3 = []
 mapChoice=[]
+statsToPrint=[]
 Fps = pygame.time.Clock()
 BlockWidth = 53
 BlockHeight = 53
@@ -14,9 +16,9 @@ spacing = 2
 rerolls = 0
 pygame.display.set_caption("BREAKOUT")
 screen = pygame.display.set_mode((0,0), pygame.RESIZABLE)
-alpha_layer = pygame.Surface((0,0),pygame.SRCALPHA, pygame.RESIZABLE)
 ScreenWidth = screen.get_width()
 ScreenHeight = screen.get_height()
+alpha_layer = pygame.Surface((ScreenWidth,ScreenHeight),pygame.SRCALPHA)
 price1 = None
 price2 = None
 price3 = None
@@ -25,10 +27,11 @@ rareLevel2= None
 rareLevel3= None
 LeftPoint = 0
 RightPoint = 0
-
-gain=1#the amount of coins dropped by a block
+coin_speed=1
+gain=100#the amount of coins dropped by a block
 TextFont = pygame.font.SysFont("Helvetica", 70)
 TextFontSmall = pygame.font.SysFont("Helvetica", 40)
+TextFontXSmall = pygame.font.SysFont("Helvetica", 30)
 TitleFont = pygame.font.SysFont("Courier new",120)
 Clock = 120
 RenderRight = TextFont.render(str(int(RightPoint)) + "$", True, (255, 0, 0))
@@ -121,34 +124,42 @@ map1 = [
 
 ]
 state="start"
-maps=[map1, map2, map3, map4, map5, map6, map7]
-#maps = [mapBlank]
+#maps=[map1, map2, map3, map4, map5, map6, map7]
+maps = [mapBlank]
 safeMaps= maps.copy()
 rarities={"common" :  [1,(130,130,130)],
           "rare": [1.5,(47,147,255)],
           "epic": [2.5,(168,0,255)],
           "legendary": [3.5,(255,156,0)]
           }
-def foundation(level=None):
+def foundation(level):
     global gain
     gain += level
+def featherweight(level):
+    global coin_speed
+    coin_speed *= (1-(level/50))
 
 
 Stats = {
     "foundation": 0,
+    "featherweight" : [0, 30]
 }
 
 upgradesCommon = [
-    ["Foundation(Common) (+1 Gain)", foundation, rarities["common"],"foundation"]
+    ["Foundation(Common) (+1 Gain)", foundation, rarities["common"],"foundation"],
+    ["FeatherWeight(Common) (-2% coin speed)", featherweight, rarities["common"],"featherweight"]
 ]
 upgradesRare = [
     ["Foundation(Rare) (+2 Gain)", foundation,rarities["rare"],"foundation"],
+    ["FeatherWeight(Rare) (-4% coin speed)", featherweight, rarities["rare"],"featherweight"]
 ]
 upgradesEpic = [
     ["Foundation(Epic) (+3 Gain)", foundation, rarities["epic"],"foundation"],
+    ["FeatherWeight(Epic) (-6% coin speed)", featherweight, rarities["epic"],"featherweight"]
 ]
 upgradesLegendary = [
     ["Foundation(Legendary!) (+4 Gain)", foundation, rarities["legendary"],"foundation"],
+    ["FeatherWeight(Legendary!) (-8% coin speed)", featherweight, rarities["legendary"],"featherweight"]
 ]
 
 #CLASS PADDLE
@@ -210,7 +221,7 @@ class Ball:
                 self.HoriVel = 0.6 if direction >= 0 else -0.6
 
             self.rect.bottom = paddle.rect.top
-            self.y = float(self.rect.y)  # Sync float tracker
+            self.y = float(self.rect.y)
             self.VertVel = 2.2
 
     def LossDetection(self):
@@ -291,7 +302,7 @@ class Coin:
 
         self.vertVel += self.gravity
         self.rect.x += self.horiVel
-        self.rect.y += self.vertVel
+        self.rect.y += self.vertVel * coin_speed
     def draw(self, surface):
         pygame.draw.circle(surface, (255, 255, 0), self.rect.center, 8)
         pygame.draw.circle(surface, (0, 0, 0), self.rect.center, 8, 2)
@@ -339,6 +350,9 @@ class Text:
 paddle1= Paddle(ScreenWidth/2, ScreenHeight-40)
 ball1 = Ball(ScreenWidth/2, ScreenHeight-150)
 def randomize():
+    global maps
+    if len(maps) == 0:
+        maps=safeMaps.copy()
     mapChoice = random.choice(maps)
     maps.remove(mapChoice)
     return mapChoice
@@ -361,19 +375,60 @@ def loadLevel(map):
     ball1.VertVel=2.2
     paddle1.rect.centerx=int(ScreenWidth/2)
     paddle1.rect.centery=ScreenHeight -40
-buttonUpgrade1 = Button(150, 150, 600, 50)
-buttonUpgrade2 = Button(150, 250, 600, 50)
-buttonUpgrade3 = Button(150, 350, 600, 50)
+buttonUpgrade1 = Button(150, 150, 800, 50)
+buttonUpgrade2 = Button(150, 250, 800, 50)
+buttonUpgrade3 = Button(150, 350, 800, 50)
 def setup_upgrades():
-    global upgrade1, upgrade2, upgrade3, bought1, bought2, bought3,rareLevel1,rareLevel2, rareLevel3, price1, price2, price3, rerollPrice
-    x=random.choices((upgradesCommon,upgradesRare,upgradesEpic,upgradesLegendary),(10,5,2,1),k=3)
-    bought1=False
-    bought2=False
-    bought3=False
-    rerollPrice=math.pow(4,rerolls + 1)
-    upgrade1 = random.choice(x[0])
-    upgrade2 = random.choice(x[1])
-    upgrade3 = random.choice(x[2])
+    global upgrade1, upgrade2, upgrade3, bought1, bought2, bought3, rareLevel1, rareLevel2, rareLevel3, price1, price2, price3, rerollPrice
+
+    OpenKeys = []
+    for key, value in Stats.items():
+        if type(value) == list:
+            if value[0] < value[1]:
+                OpenKeys.append(key)
+        else:
+            OpenKeys.append(key)
+
+    OpenCommon = []
+    for x in upgradesCommon:
+        if x[3] in OpenKeys:
+            OpenCommon.append(x)
+
+    OpenRare = []
+    for x in upgradesRare:
+        if x[3] in OpenKeys:
+            OpenRare.append(x)
+
+    OpenEpic = []
+    for x in upgradesEpic:
+        if x[3] in OpenKeys:
+            OpenEpic.append(x)
+
+    OpenLegend = []
+    for x in upgradesLegendary:
+        if x[3] in OpenKeys:
+            OpenLegend.append(x)
+
+    if len(OpenCommon) == 0:
+        OpenCommon = upgradesCommon
+        OpenRare = upgradesRare
+        OpenEpic = upgradesEpic
+        OpenLegend = upgradesLegendary
+
+    chosen_pools = random.choices(
+        (OpenCommon, OpenRare, OpenEpic, OpenLegend),(10, 5, 2, 1),k=3)
+
+    bought1 = False
+    bought2 = False
+    bought3 = False
+    rerollPrice = math.pow(4, rerolls + 1)
+
+    # 8. Pull a random upgrade out of the valid pools you rolled
+    upgrade1 = random.choice(chosen_pools[0])
+    upgrade2 = random.choice(chosen_pools[1])
+    upgrade3 = random.choice(chosen_pools[2])
+
+    # ... (Keep your exact rareLevel check and price calculation logic here)
     if upgrade1[2] == rarities["common"]:
         rareLevel1=1
     if upgrade1[2] == rarities["rare"]:
@@ -405,7 +460,9 @@ def calculate(upgrade):
     rarityMult = upgrade[2][0]
     upgradeKey = upgrade[3]
     statLvl = Stats.get(upgradeKey)
-    basePrice = 12 * math.pow(1.5, statLvl - 1)
+    if type(statLvl) == list:
+        statLvl = statLvl[0]
+    basePrice = 12 * math.pow(1.5, statLvl)
     return int(basePrice * rarityMult * random.uniform(0.8,1.2))
 
 def load_upgrades():
@@ -423,11 +480,28 @@ def load_upgrades():
         buttonUpgrade3.draw(screen,(0,100,0),upgrade3[0] + str(price3) + "$",(0,0,0), Font= TextFontSmall, BorderColour= upgrade3[2][1])
     elif bought3 == False:
         buttonUpgrade3.draw(screen,upgrade3[2][1],upgrade3[0] + str(price3) + "$",(0,0,0), Font= TextFontSmall)
+def load_stats():
+    global statsToPrint
+    x = ScreenWidth - 400
+    y = 130
+    for key, value in Stats.items():
+        if type(value) == list:
+            if value[0] > 0:
+                statsToPrint.append(key + ": " + str(value[0])+"/"+ str(value[1]))
+        else:
+            if value > 0:
+                statsToPrint.append(key + ": " + str(value))
+    for stat in statsToPrint:
+        statSurf = TextFontXSmall.render(stat, True, (255,255,255))
+        screen.blit(statSurf, (x, y))
+        y += 30
+    statsToPrint = []
+
 border1 = Border(ScreenWidth/2-220)
 border2 = Border(ScreenWidth/2+220)
 buttonPlay = Button(ScreenWidth/2 - 100, ScreenHeight-150, 200, 70)
 buttonContinue = Button(ScreenWidth/2, ScreenHeight-150, 250, 70)
-buttonReroll = Button(ScreenWidth - 300, 150, 200, 50)
+buttonReroll = Button(ScreenWidth - 300, 50, 200, 50)
 titleText = Text(ScreenWidth/2 - 370,100)
 
 
@@ -435,41 +509,45 @@ coins=[]
 Running = True
 while Running:
     Fps.tick(Clock)
-    if len(maps) == 0:
-        maps=safeMaps.copy()
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             print(RightPoint)
             Running = False
             pygame.quit()
+            sys.exit()
         elif buttonPlay.clickable(event) and state == "start":
             state = "gameplay"
             loadLevel(randomize())
         elif state == "upgrades":
             if buttonContinue.clickable(event):
+                level += 1
                 state = "gameplay"
                 loadLevel(randomize())
-                if bought1 == True:
-                    upgrade1[1](rareLevel1)
-                    Stats[upgrade1[3]] += rareLevel1
-                if bought2 == True:
-                    upgrade2[1](rareLevel2)
-                    Stats[upgrade2[3]] += rareLevel2
-                if bought3 == True:
-                    upgrade3[1](rareLevel3)
-                    Stats[upgrade3[3]] += rareLevel3
-                level += 1
             elif buttonUpgrade1.clickable(event) and bought1 == False and RightPoint >= price1:
                 bought1 = True
                 RightPoint -= price1
-
+                upgrade1[1](rareLevel1)
+                if type(Stats[upgrade1[3]]) == list:
+                    Stats[upgrade1[3]][0] += rareLevel1
+                else:
+                    Stats[upgrade1[3]] += rareLevel1
             elif buttonUpgrade2.clickable(event) and bought2 == False and RightPoint >= price2:
                 bought2 = True
                 RightPoint -= price2
 
+                upgrade2[1](rareLevel2)
+                if type(Stats[upgrade2[3]]) == list:
+                    Stats[upgrade2[3]][0] += rareLevel2
+                else:
+                    Stats[upgrade2[3]] += rareLevel2
             elif buttonUpgrade3.clickable(event) and bought3 == False and RightPoint >= price3:
                 bought3 = True
                 RightPoint -= price3
+                upgrade3[1](rareLevel3)
+                if type(Stats[upgrade3[3]]) == list:
+                    Stats[upgrade3[3]][0] += rareLevel3
+                else:
+                    Stats[upgrade3[3]] += rareLevel3
 
             elif buttonReroll.clickable(event) and RightPoint >= rerollPrice:
                 rerolls += 1
@@ -492,12 +570,13 @@ while Running:
         ball1.draw(screen)
         border1.draw(screen)
         border2.draw(screen)
-        screen.blit(RenderRight, (0 + 30, 0 + 30))
         alpha_layer.fill((0,0,0, 220))
         screen.blit(alpha_layer, (0,0))
+        screen.blit(RenderRight, (0 + 30, 0 + 30))
         buttonContinue.draw(screen,(0,255,0), "continue", (0,0,0))
         buttonReroll.draw(screen, (200, 200, 200),"Reroll " + str(int(rerollPrice)) + "$", (255,255,255), border = 5, Font= TextFontSmall)
         load_upgrades()
+        load_stats()
 
     if state == "pause":
         screen.fill((0, 0, 0))
