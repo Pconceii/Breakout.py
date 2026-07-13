@@ -50,28 +50,28 @@ StartScreenSprite = pygame.image.load(resource_path("Sprites/startScreen.png")).
 StartScreenSprite = pygame.transform.scale(StartScreenSprite, (ScreenWidth,ScreenHeight))
 
 CommonBought = pygame.image.load(resource_path("Sprites/commonYes.png")).convert_alpha()
-CommonBought = pygame.transform.scale(CommonBought, (800,70))
+CommonBought = pygame.transform.scale(CommonBought, (850,70))
 
 CommonNot = pygame.image.load(resource_path("Sprites/commonNo.png")).convert_alpha()
-CommonNot = pygame.transform.scale(CommonNot, (800,70))
+CommonNot = pygame.transform.scale(CommonNot, (850,70))
 
 RareBought = pygame.image.load(resource_path("Sprites/rareYes.png")).convert_alpha()
-RareBought = pygame.transform.scale(RareBought, (800,70))
+RareBought = pygame.transform.scale(RareBought, (850,70))
 
 RareNot = pygame.image.load(resource_path("Sprites/rareNo.png")).convert_alpha()
-RareNot = pygame.transform.scale(RareNot, (800,70))
+RareNot = pygame.transform.scale(RareNot, (850,70))
 
 EpicBought = pygame.image.load(resource_path("Sprites/epicYes.png")).convert_alpha()
-EpicBought = pygame.transform.scale(EpicBought, (800,70))
+EpicBought = pygame.transform.scale(EpicBought, (850,70))
 
 EpicNot = pygame.image.load(resource_path("Sprites/epicNo.png")).convert_alpha()
-EpicNot = pygame.transform.scale(EpicNot, (800,70))
+EpicNot = pygame.transform.scale(EpicNot, (850,70))
 
 LegendBought = pygame.image.load(resource_path("Sprites/legendYes.png")).convert_alpha()
-LegendBought = pygame.transform.scale(LegendBought, (800,70))
+LegendBought = pygame.transform.scale(LegendBought, (850,70))
 
 LegendNot = pygame.image.load(resource_path("Sprites/legendNo.png")).convert_alpha()
-LegendNot = pygame.transform.scale(LegendNot, (800,70))
+LegendNot = pygame.transform.scale(LegendNot, (850,70))
 
 RerollSprite = pygame.image.load(resource_path("Sprites/RerollSprite.png")).convert_alpha()
 RerollSprite = pygame.transform.scale(RerollSprite, (300,48))
@@ -87,6 +87,7 @@ rareLevel2= None
 rareLevel3= None
 RightPoint = 0
 coin_speed=1
+widthMult = 1
 gain=1 # the amount of coins dropped by a block
 
 TextFont = pygame.font.Font(resource_path("Fonts/PressStart2P.ttf"), 60)
@@ -185,9 +186,9 @@ map1 = [
 
 ]
 state="start"
-#maps=[map1, map2, map3, map4, map5, map6, map7]
+maps=[map1, map2, map3, map4, map5, map6, map7]
 #maps = [mapBlank]
-maps=[map2]
+#maps=[map2]
 safeMaps= maps.copy()
 rarities={"common" :  [1,[CommonNot, CommonBought]],
           "rare": [1.5,[RareNot,RareBought]],
@@ -200,39 +201,52 @@ def foundation(level):
 def featherweight(level):
     global coin_speed
     coin_speed *= (1-(level/25))
-
+def expansion(level):
+    global widthMult
+    widthMult *= (1+(level/25))
 
 StatsBlank = {
     "foundation": 0,
-    "featherweight" : [0, 30]
+    "featherweight" : [0, 30],
+    "Expansion Pack" : [0, 20]
 }
 
 Stats=copy.deepcopy(StatsBlank)
 
 upgradesCommon = [
     ["Foundation(Common) (+1 Gain)", foundation, rarities["common"],"foundation"],
-    ["FeatherWeight(Common) (-4% coin speed)", featherweight, rarities["common"],"featherweight"]
+    ["FeatherWeight(Common) (-4% coin speed)", featherweight, rarities["common"],"featherweight"],
+    ["Expansion Pack(Common) (+4% paddle size)", expansion, rarities["common"], "Expansion Pack"]
 ]
 upgradesRare = [
     ["Foundation(Rare) (+2 Gain)", foundation,rarities["rare"],"foundation"],
-    ["FeatherWeight(Rare) (-8% coin speed)", featherweight, rarities["rare"],"featherweight"]
+    ["FeatherWeight(Rare) (-8% coin speed)", featherweight, rarities["rare"],"featherweight"],
+    ["Expansion Pack(Rare) (+8% paddle size)", expansion, rarities["rare"], "Expansion Pack"]
 ]
 upgradesEpic = [
     ["Foundation(Epic) (+3 Gain)", foundation, rarities["epic"],"foundation"],
-    ["FeatherWeight(Epic) (-12% coin speed)", featherweight, rarities["epic"],"featherweight"]
+    ["FeatherWeight(Epic) (-12% coin speed)", featherweight, rarities["epic"],"featherweight"],
+    ["Expansion Pack(Epic) (+12% paddle size)", expansion, rarities["epic"], "Expansion Pack"]
 ]
 upgradesLegendary = [
     ["Foundation(Legendary!) (+4 Gain)", foundation, rarities["legendary"],"foundation"],
-    ["FeatherWeight(Legendary!) (-16% coin speed)", featherweight, rarities["legendary"],"featherweight"]
+    ["FeatherWeight(Legendary!) (-16% coin speed)", featherweight, rarities["legendary"],"featherweight"],
+    ["Expansion Pack(Legendary!) (+16% paddle size)", expansion, rarities["legendary"], "Expansion Pack"]
 ]
 
 #CLASS PADDLE
 class Paddle:
     def __init__(self, x, y):
         self.height=35
-        self.width=110
+        self.baseWidth=110
+        self.width = self.baseWidth
         self.rect = pygame.Rect(x - self.width/2, y, self.width, self.height)
         self.speed=6
+    def check_width(self):
+        self.width = int(self.baseWidth * widthMult)
+        centre = self.rect.centerx
+        self.rect.width = self.width
+        self.rect.centerx = centre
     def move(self, key_front, key_back):
         keys=pygame.key.get_pressed()
         if keys[key_back]:
@@ -244,7 +258,8 @@ class Paddle:
         if self.rect.right > int(ScreenWidth/2 + 220):
             self.rect.right = int(ScreenWidth/2 + 220)
     def draw(self, surface):
-        surface.blit(paddleSprite, (self.rect.x, self.rect.y))
+        scaledSprite = pygame.transform.scale(paddleSprite, (self.width, self.height))
+        surface.blit(scaledSprite, (self.rect.x, self.rect.y))
 
 
 class Ball:
@@ -460,14 +475,15 @@ def loadLevel(map):
     ball1.rect.centery = ScreenHeight - 150
     ball1.x = float(ball1.rect.x)
     ball1.y = float(ball1.rect.y)
-    ball1.base_speed = 3.2 + (level * 0.2)  # Gets slightly faster each level you beat!
+    ball1.baseVel = 3.2 + (level * 0.2)  # Gets slightly faster each level you beat!
     ball1.HoriVel = 0
-    ball1.VertVel = ball1.base_speed
+    ball1.VertVel = ball1.baseVel
+    paddle1.check_width()
     paddle1.rect.centerx=int(ScreenWidth/2)
     paddle1.rect.centery=ScreenHeight -40
-buttonUpgrade1 = Button(150, 150, 800, 70)
-buttonUpgrade2 = Button(150, 250, 800, 70)
-buttonUpgrade3 = Button(150, 350, 800, 70)
+buttonUpgrade1 = Button(150, 150, 850, 70)
+buttonUpgrade2 = Button(150, 250, 850, 70)
+buttonUpgrade3 = Button(150, 350, 850, 70)
 def setup_upgrades():
     global upgrade1, upgrade2, upgrade3, bought1, bought2, bought3, rareLevel1, rareLevel2, rareLevel3, price1, price2, price3, rerollPrice
 
@@ -747,6 +763,7 @@ while Running:
             RenderRight = TextFont.render(str(int(RightPoint)) + "$", True, (255, 0, 0))
             gain = 1
             coin_speed = 1
+            widthMult = 1
             level = 1
             rerolls = 0
             Stats = copy.deepcopy(StatsBlank)
