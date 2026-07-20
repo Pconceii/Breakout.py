@@ -26,11 +26,20 @@ BlockWidth = 53
 BlockHeight = 53
 spacing = 2
 rerolls = 0
+comboRed= 0
+comboGreen=200
+comboWidth= 300
+shakeTime=0
+shakeIntensity=2
+xOffset=0
+yOffset=0
+comboTime=0
 pygame.display.set_caption("Shatter Loop")
 screen = pygame.display.set_mode((1366,768))
 ScreenWidth = screen.get_width()
 ScreenHeight = screen.get_height()
 alpha_layer = pygame.Surface((ScreenWidth,ScreenHeight),pygame.SRCALPHA)
+game_surface = pygame.Surface((ScreenWidth, ScreenHeight))
 coinSprite = pygame.image.load(resource_path("Sprites/coin.png")).convert_alpha()
 coinSprite = pygame.transform.scale(coinSprite, (17,17))
 
@@ -74,7 +83,7 @@ LegendNot = pygame.image.load(resource_path("Sprites/legendNo.png")).convert_alp
 LegendNot = pygame.transform.scale(LegendNot, (850,70))
 
 RerollSprite = pygame.image.load(resource_path("Sprites/RerollSprite.png")).convert_alpha()
-RerollSprite = pygame.transform.scale(RerollSprite, (300,48))
+RerollSprite = pygame.transform.scale(RerollSprite, (250,48))
 
 ContinueSprite = pygame.image.load(resource_path("Sprites/Continue.png")).convert_alpha()
 ContinueSprite = pygame.transform.scale(ContinueSprite, (400,64))
@@ -87,13 +96,15 @@ rareLevel2= None
 rareLevel3= None
 RightPoint = 0
 coin_speed=1
+combo = 0
 widthMult = 1
 gain=1 # the amount of coins dropped by a block
+comboGain=1
 
-TextFont = pygame.font.Font(resource_path("Fonts/PressStart2P.ttf"), 60)
-TextFontMid = pygame.font.Font(resource_path("Fonts/PressStart2P.ttf"), 30)
-TextFontSmall = pygame.font.Font(resource_path("Fonts/PressStart2P.ttf"), 17)
-TextFontXSmall = pygame.font.Font(resource_path("Fonts/PressStart2P.ttf"), 10)
+TextFont = pygame.font.Font(resource_path("Fonts/Silkscreen-Regular.ttf"), 70)
+TextFontMid = pygame.font.Font(resource_path("Fonts/Silkscreen-Regular.ttf"), 40)
+TextFontSmall = pygame.font.Font(resource_path("Fonts/Silkscreen-Regular.ttf"), 25)
+TextFontXSmall = pygame.font.Font(resource_path("Fonts/Silkscreen-Regular.ttf"), 20)
 
 Clock = 120
 RenderRight = TextFont.render(str(int(RightPoint)) + "$", True, (255, 0, 0))
@@ -204,11 +215,17 @@ def featherweight(level):
 def expansion(level):
     global widthMult
     widthMult *= (1+(level/25))
-
+def streak(level):
+    global comboGain
+    if level==3:
+        comboGain += 1
+    if level==4:
+        comboGain += 2
 StatsBlank = {
     "foundation": 0,
     "featherweight" : [0, 30],
-    "Expansion Pack" : [0, 20]
+    "Expansion Pack" : [0, 20],
+    "Hit Streak" : 0
 }
 
 Stats=copy.deepcopy(StatsBlank)
@@ -221,17 +238,19 @@ upgradesCommon = [
 upgradesRare = [
     ["Foundation(Rare) (+2 Gain)", foundation,rarities["rare"],"foundation"],
     ["FeatherWeight(Rare) (-8% coin speed)", featherweight, rarities["rare"],"featherweight"],
-    ["Expansion Pack(Rare) (+8% paddle size)", expansion, rarities["rare"], "Expansion Pack"]
+    ["Expansion Pack(Rare) (+8% paddle size)", expansion, rarities["rare"], "Expansion Pack"],
 ]
 upgradesEpic = [
     ["Foundation(Epic) (+3 Gain)", foundation, rarities["epic"],"foundation"],
     ["FeatherWeight(Epic) (-12% coin speed)", featherweight, rarities["epic"],"featherweight"],
-    ["Expansion Pack(Epic) (+12% paddle size)", expansion, rarities["epic"], "Expansion Pack"]
+    ["Expansion Pack(Epic) (+12% paddle size)", expansion, rarities["epic"], "Expansion Pack"],
+    ["Hit Streak(Epic) (+1 gain per combo)", streak, rarities["epic"], "Hit Streak"]
 ]
 upgradesLegendary = [
     ["Foundation(Legendary!) (+4 Gain)", foundation, rarities["legendary"],"foundation"],
     ["FeatherWeight(Legendary!) (-16% coin speed)", featherweight, rarities["legendary"],"featherweight"],
-    ["Expansion Pack(Legendary!) (+16% paddle size)", expansion, rarities["legendary"], "Expansion Pack"]
+    ["Expansion Pack(Legendary!) (+16% paddle size)", expansion, rarities["legendary"], "Expansion Pack"],
+    ["Hit Streak(Legendary!) (+2 gain per combo)", streak, rarities["legendary"], "Hit Streak"]
 ]
 
 #CLASS PADDLE
@@ -450,9 +469,27 @@ class Particle:
     def draw(self, surface):
         size = max(1, int(self.lifetime / 3))
         pygame.draw.rect(surface, (200, 200, 200), (int(self.x), int(self.y), size, size))
-
+class ComboBar:
+    def __init__(self, x, y, height):
+        self.x = x
+        self.y =y
+        self.height = height
+        self.StartWidth = comboWidth
+    def draw(self, surface, red, green):
+        red = min(255, red)
+        green = max(0, green)
+        self.outlineRect = pygame.Rect(self.x - 5, self.y - 5, self.StartWidth + 10, self.height + 10)
+        self.rect = pygame.Rect(self.x, self.y, comboWidth, self.height)
+        pygame.draw.rect(surface, (0, 0, 0), self.outlineRect)
+        pygame.draw.rect(surface, (255, 255, 255), self.outlineRect, width= 2)
+        pygame.draw.rect(surface, (red, green, 0), self.rect)
+        comboRender1=TextFontSmall.render("x" + str(combo), True ,(255,255,255))
+        game_surface.blit(comboRender1, (self.x, self.y + self.height + 5))
+        comboRender2=TextFontXSmall.render("combo", True ,(255,255,255))
+        game_surface.blit(comboRender2, (self.x + 220, self.y - 35))
 paddle1= Paddle(ScreenWidth/2, ScreenHeight-40)
 ball1 = Ball(ScreenWidth/2, ScreenHeight-150)
+comboMeter = ComboBar(ScreenWidth - 430, 50, 30)
 def randomize():
     global maps
     if len(maps) == 0:
@@ -569,19 +606,19 @@ def calculate(upgrade):
 
 def load_upgrades():
     if bought1 == True:
-        buttonUpgrade1.draw(screen,(0,100,0),(0,0,0),Text=upgrade1[0] + str(price1) + "$", Font= TextFontSmall, Sprite=upgrade1[2][1][1])
+        buttonUpgrade1.draw(game_surface,(0,100,0),(0,0,0),Text=upgrade1[0] + " " + str(price1) + "$", Font= TextFontSmall, Sprite=upgrade1[2][1][1])
     elif bought1 == False:
-        buttonUpgrade1.draw(screen,(0,100,0),(0,0,0),Text=upgrade1[0] + str(price1) + "$", Font= TextFontSmall, Sprite=upgrade1[2][1][0])
+        buttonUpgrade1.draw(game_surface,(0,100,0),(0,0,0),Text=upgrade1[0] + " " + str(price1) + "$", Font= TextFontSmall, Sprite=upgrade1[2][1][0])
 
     if bought2 == True:
-        buttonUpgrade2.draw(screen, (0, 100, 0), (0, 0, 0), Text=upgrade2[0] + str(price2) + "$", Font=TextFontSmall,Sprite=upgrade2[2][1][1])
+        buttonUpgrade2.draw(game_surface, (0, 100, 0), (0, 0, 0), Text=upgrade2[0] + " " + str(price2) + "$", Font=TextFontSmall,Sprite=upgrade2[2][1][1])
     elif bought2 == False:
-        buttonUpgrade2.draw(screen, (0, 100, 0), (0, 0, 0), Text=upgrade2[0] + str(price2) + "$", Font=TextFontSmall,Sprite=upgrade2[2][1][0])
+        buttonUpgrade2.draw(game_surface, (0, 100, 0), (0, 0, 0), Text=upgrade2[0] + " " + str(price2) + "$", Font=TextFontSmall,Sprite=upgrade2[2][1][0])
 
     if bought3 == True:
-        buttonUpgrade3.draw(screen, (0, 100, 0), (0, 0, 0), Text=upgrade3[0] + str(price3) + "$", Font=TextFontSmall,Sprite=upgrade3[2][1][1])
+        buttonUpgrade3.draw(game_surface, (0, 100, 0), (0, 0, 0), Text=upgrade3[0] + " " + str(price3) + "$", Font=TextFontSmall,Sprite=upgrade3[2][1][1])
     elif bought3 == False:
-        buttonUpgrade3.draw(screen, (0, 100, 0), (0, 0, 0), Text=upgrade3[0] + str(price3) + "$", Font=TextFontSmall,Sprite=upgrade3[2][1][0])
+        buttonUpgrade3.draw(game_surface, (0, 100, 0), (0, 0, 0), Text=upgrade3[0] + " " + str(price3) + "$", Font=TextFontSmall,Sprite=upgrade3[2][1][0])
 def load_stats():
     global statsToPrint
     x = ScreenWidth - 350
@@ -603,14 +640,14 @@ border1 = Border(ScreenWidth/2-220)
 border2 = Border(ScreenWidth/2+220)
 buttonPlay = Button(ScreenWidth/2 + 200, ScreenHeight-200, 400, 150)
 buttonContinue = Button(160,450, 400, 64)
-buttonReroll = Button(ScreenWidth - 400, 50, 300, 48)
+buttonReroll = Button(ScreenWidth - 400, 50, 250, 48)
 titleText = Text(ScreenWidth/2 - 370,100)
 
 
 coins=[]
 Running = True
 while Running:
-    Fps.tick(Clock)
+    dt = Fps.tick(Clock) / 1000
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             print(RightPoint)
@@ -663,75 +700,101 @@ while Running:
                 elif state == "pause":
                     state = "gameplay"
     if state == "start":
-        screen.fill((0,0,0))
-        screen.blit(StartScreenSprite, (0,0))
-        buttonPlay.draw(screen,(0,255,0), (0,0,0), Sprite=StartSprite)
+        game_surface.fill((0,0,0))
+        game_surface.blit(StartScreenSprite, (0,0))
+        buttonPlay.draw(game_surface,(0,255,0), (0,0,0), Sprite=StartSprite)
     if state == "upgrades":
-        screen.fill((0, 0, 0))
-        paddle1.draw(screen)
-        ball1.draw(screen)
-        border1.draw(screen)
-        border2.draw(screen)
+        game_surface.fill((0, 0, 0))
+        paddle1.draw(game_surface)
+        ball1.draw(game_surface)
+        border1.draw(game_surface)
+        border2.draw(game_surface)
         alpha_layer.fill((0,0,0, 220))
-        screen.blit(alpha_layer, (0,0))
-        screen.blit(RenderRight, (0 + 30, 0 + 30))
-        buttonContinue.draw(screen,(0,255,0),(0,0,0),Text="Continue", Font= TextFontMid,Sprite = ContinueSprite)
-        buttonReroll.draw(screen, (200, 200, 200),(255,255,255), border = 5, Font=TextFontSmall ,Text ="Reroll " + str(int(rerollPrice)) + "$", Sprite=RerollSprite)
+        game_surface.blit(alpha_layer, (0,0))
+        game_surface.blit(RenderRight, (0 + 30, 0 + 30))
+        buttonContinue.draw(game_surface,(0,255,0),(0,0,0),Text="Continue", Font= TextFontMid,Sprite = ContinueSprite)
+        buttonReroll.draw(game_surface, (200, 200, 200),(255,255,255), border = 5, Font=TextFontSmall ,Text ="Reroll " + str(int(rerollPrice)) + "$", Sprite=RerollSprite)
         load_upgrades()
         load_stats()
 
     if state == "pause":
-        screen.fill((0, 0, 0))
+        game_surface.fill((0, 0, 0))
         for block in Blocks:
-            block.draw(screen)
+            block.draw(game_surface)
         for coin in coins:
-            coin.draw(screen)
-        paddle1.draw(screen)
-        ball1.draw(screen)
-        border1.draw(screen)
-        border2.draw(screen)
-        screen.blit(RenderRight, (0 + 30, 0 + 30))
+            coin.draw(game_surface)
+        paddle1.draw(game_surface)
+        ball1.draw(game_surface)
+        border1.draw(game_surface)
+        border2.draw(game_surface)
+        game_surface.blit(RenderRight, (0 + 30, 0 + 30))
         alpha_layer.fill((0,0,0, 150))
-        screen.blit(alpha_layer, (0,0))
+        game_surface.blit(alpha_layer, (0,0))
     if state == "loss":
-        screen.fill((0, 0, 0))
+        game_surface.fill((0, 0, 0))
         for block in Blocks:
-            block.draw(screen)
+            block.draw(game_surface)
         for coin in coins:
-            coin.draw(screen)
-        paddle1.draw(screen)
-        ball1.draw(screen)
-        border1.draw(screen)
-        border2.draw(screen)
-        screen.blit(RenderRight, (0 + 30, 0 + 30))
+            coin.draw(game_surface)
+        paddle1.draw(game_surface)
+        ball1.draw(game_surface)
+        border1.draw(game_surface)
+        border2.draw(game_surface)
+        game_surface.blit(RenderRight, (0 + 30, 0 + 30))
         alpha_layer.fill((0,0,0, 150))
-        screen.blit(alpha_layer, (0,0))
+        game_surface.blit(alpha_layer, (0,0))
     if state == "gameplay":
-        screen.fill((50, 50, 50))
+        game_surface.fill((50, 50, 50))
         ball1.move()
         paddle1.move(pygame.K_d, pygame.K_a)
         ball1.collide(paddle1)
+        xOffset = 0
+        yOffset = 0
+        if shakeTime > 0:
+            shakeTime -= dt
+            xOffset = random.randint(-shakeIntensity,shakeIntensity)
+            yOffset = random.randint(-shakeIntensity,shakeIntensity)
         for particle in particles:
             particle.move()
-            particle.draw(screen)
+            particle.draw(game_surface)
             if particle.lifetime <= 0:
                 particles.remove(particle)
 
         for block in list(Blocks):
-            block.draw(screen)
+            block.draw(game_surface)
             if block.collide(ball1):
                 Blocks.remove(block)
+                shakeTime = 0.10
                 for _ in range(6):
                     particles.append(Particle(block.rect.centerx, block.rect.centery))
 
-                for i in range(gain):
+                for i in range(gain + (combo * comboGain)):
                     coin = Coin(block.rect.centerx, block.rect.centery)
                     coin.horiVel = random.uniform(-1.5, 1.5)
                     coin.vertVel = random.uniform(-5, -2)
                     coins.append(coin)
+                combo += 1
+                comboTime = 1
+                comboRed = 1
+                comboGreen = 255
+                comboWidth=300
+
+        if combo > 0:
+            if comboTime > 0:
+                comboTime -= dt
+                comboRed= int(max(0, 254 * (1- comboTime)))
+                comboGreen= int(min(255,255* comboTime))
+                comboWidth = int(300* comboTime)
+                comboMeter.draw(game_surface, comboRed, comboGreen)
+            else:
+                comboTime=0
+                comboRed = 1
+                comboGreen = 255
+                comboWidth = 300
+                combo = 0
         for coin in list(coins):
 
-            coin.draw(screen)
+            coin.draw(game_surface)
             BlocksToCheck=Blocks.copy()
             coin.speed = 0
             coin.move()
@@ -748,13 +811,15 @@ while Running:
         if len(coins) == 0 and len(Blocks) == 0:
             print(Stats)
             rerolls=0
+            combo=0
+            comboTime=0
             state = "upgrades"
             setup_upgrades()
 
-        paddle1.draw(screen)
-        ball1.draw(screen)
-        border1.draw(screen)
-        border2.draw(screen)
+        paddle1.draw(game_surface)
+        ball1.draw(game_surface)
+        border1.draw(game_surface)
+        border2.draw(game_surface)
         if ball1.LossDetection():
             RightPoint = 0
             coins = []
@@ -766,6 +831,10 @@ while Running:
             widthMult = 1
             level = 1
             rerolls = 0
+            comboGain = 1
+            combo=0
+            comboTime = 0
             Stats = copy.deepcopy(StatsBlank)
-        screen.blit(RenderRight, (0 + 30, 0 + 30))
+        game_surface.blit(RenderRight, (0 + 30, 0 + 30))
+    screen.blit(game_surface, (xOffset, yOffset))
     pygame.display.flip()
